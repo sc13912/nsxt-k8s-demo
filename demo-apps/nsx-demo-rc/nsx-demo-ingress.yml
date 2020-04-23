@@ -1,0 +1,15 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: nsx-demo-ingress
+  namespace: nsx-demo-rc
+spec:
+  rules:
+  - host: nsx.demo.vxlan.co
+    http:
+      paths:
+      - path: /*
+        backend:
+          serviceName: nsx-demo
+          servicePort: 80
+

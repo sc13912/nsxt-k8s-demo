@@ -1,0 +1,196 @@
+#apiVersion: v1
+#kind: Namespace
+#metadata:
+#   name: yelb-app
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-server
+  namespace: yelb-app
+  labels:
+    app: redis-server
+    tier: cache
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+  selector:
+    app: redis-server
+    tier: cache
+---
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: yelb-db
+  namespace: yelb-app
+  labels:
+    app: yelb-db
+    tier: backenddb
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+  selector:
+    app: yelb-db
+    tier: backenddb
+---
+
+
+# K8s App Server Svc
+apiVersion: v1
+kind: Service
+metadata:
+  name: yelb-appserver
+  namespace: yelb-app
+  labels:
+    app: yelb-appserver
+    tier: middletier
+spec:
+  type: ClusterIP
+  ports:
+  - port: 4567
+  selector:
+    app: yelb-appserver
+    tier: middletier
+---
+
+
+# K8s Web Frontend Svc
+apiVersion: v1
+kind: Service
+metadata:
+  name: yelb-ui
+  namespace: yelb-app
+  labels:
+    app: yelb-ui
+    tier: frontend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+  selector:
+    app: yelb-ui
+    tier: frontend
+---
+
+
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: yelb-ui
+  namespace: yelb-app
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: yelb-ui
+        tier: frontend
+        # Note the secgroup Label, it will be used to match firewall in the ruleset
+        secgroup: web-tier
+    spec:
+      containers:
+      - name: yelb-ui
+        image: mreferre/yelb-ui:0.3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+---
+
+
+# App middleware Deployment Spec
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: yelb-appserver
+  namespace: yelb-app
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: yelb-appserver
+        tier: middletier
+        # Note the secgroup Label, it will be used to match firewall in the ruleset
+        secgroup: app-tier
+    spec:
+      containers:
+      - name: yelb-appserver
+        image: mreferre/yelb-appserver:0.3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 4567
+---
+
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: redis-server
+  namespace: yelb-app
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: redis-server
+        tier: cache
+    spec:
+      containers:
+      - name: redis-server
+        image: redis:4.0.2
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 6379
+---
+
+
+
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: yelb-db
+  namespace: yelb-app
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: yelb-db
+        tier: backenddb
+    spec:
+      containers:
+      - name: yelb-db
+        image: mreferre/yelb-db:0.3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5432
+---
+
+
+# Added Inress Rule for N/S Load-Balancing
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: yelb-ui-ingress
+  namespace: yelb-app
+spec:
+  rules:
+    - host: yelb.demo.vxlan.co
+      http:
+        paths:
+          - path: /*
+            backend:
+              serviceName: yelb-ui
+              servicePort: 80
+---
+
+
+
+
